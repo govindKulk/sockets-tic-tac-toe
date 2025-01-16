@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="index.css" />
+
+
+    <style type="text/tailwindcss">
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            width: 100%;
+        }
+        #board {
+            display: inline-flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+
+            @apply rounded-xl shadow-lg border-[3px] border-slate-300;
+        }
+        .row {
+            display: flex;
+            min-width: 300px;
+            min-height: 100px;
+        }
+        .cell 
+        {
+            @apply border border-slate-200 hover:bg-blue-400/10 transition delay-100
+            text-2xl font-bold flex justify-center items-center text-center text-slate-500
+            ;
+            
+            width: 100px;
+            cursor: pointer;
+            height: 100px;
+
+        }
+
+        .row .cell:first-of-type {
+            border-left: 0px;
+        }
+        .row .cell:last-of-type {
+            border-right: 0px;
+        }
+        .row:first-of-type .cell {
+            border-top: 0px;
+        }
+        .row:last-of-type .cell {
+            border-bottom: 0px;
+        }
+
+        #reset-btn {
+            @apply w-16 h-16 rounded-full shadow-xl p-2 border border-slate-200  flex items-center justify-center bg-white hover:bg-slate-100 my-4 transition;
+        }
+
+        
+    </style>
+    <title>Tic Tac Toe</title>
+</head>
+
+<body>
+
+    <section class="game-container">
+
+        <div id="result" class="text-2xl py-4 text-slate-600 font-bold italic ">
+
+            X is a winner
+
+        </div>
+        <div id="board"></div>
+        
+        <button id="reset-btn">
+            <svg height="30px" width="30px" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--!Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.--><path d="M463.5 224l8.5 0c13.3 0 24-10.7 24-24l0-128c0-9.7-5.8-18.5-14.8-22.2s-19.3-1.7-26.2 5.2L413.4 96.6c-87.6-86.5-228.7-86.2-315.8 1c-87.5 87.5-87.5 229.3 0 316.8s229.3 87.5 316.8 0c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0c-62.5 62.5-163.8 62.5-226.3 0s-62.5-163.8 0-226.3c62.2-62.2 162.7-62.5 225.3-1L327 183c-6.9 6.9-8.9 17.2-5.2 26.2s12.5 14.8 22.2 14.8l119.5 0z"/></svg>
+        </button>
+    </section>
+
+    <script src="game.js"></script>
+
+</body>
+
+</html>
