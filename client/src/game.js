@@ -11,6 +11,7 @@ class Game {
     winner = null;
     user = null
     isYourMove = false
+    isOpponentJoined = false
     board = document.getElementById('board');
     resultContainer = document.getElementById('result');
     resetBtn = document.getElementById('reset-btn');
@@ -32,17 +33,36 @@ class Game {
     }
     
     connectToServer() {
-        this.socket = io('http://localhost:3000');
+        this.socket = io("https://sockets-tic-tac-toe.onrender.com", {
+            withCredentials: true, // Must match server credentials
+            transports: ["websocket"], // Ensure WebSocket transport is used
+        });
         console.log(this.socket)
 
         this.socket.on('join-game', (data) => {
-            const {roomId, user} = data;
-            this.user = user;
+            const {roomId, player1, player2} = data;
+            this.user = (this.socket.id === player1 ? 'player-1' : 'player-2')
+
+            this.init()
+
+            this.isYourMove = false
+            if (player1 && player2){
+                this.isOpponentJoined = true;
+                this.setMove();
+                if(this.user === 'player-1'){
+                    this.isYourMove = true;
+                }
+            }
+            
             console.log(roomId)
+
         })
         
         this.socket.on('opponent-disconnected', () => {
+            this.moveContainer.textContent = "Opponent disconnected ! Waiting for a new oppenent."
             console.log("opponent no more")
+            this.isOpponentJoined = false;
+            this.socket.emit('rematch')
         } )
 
         this.socket.on('start-game', (data) => {
@@ -81,6 +101,7 @@ class Game {
         if(!this.socket){
             this.connectToServer();
         }else{
+        
             this.setMove();
             if(this.user === 'player-1'){
                 this.isYourMove = true;
@@ -217,7 +238,11 @@ class Game {
     setMove() {
             this.move = this.user === 'player-1' ? this.player1: this.player2;
             this.moveContainer.style.display = 'block'
-            this.moveContainer.textContent = 'You are: ' + this.move;
+            if (this.isOpponentJoined){
+                this.moveContainer.textContent = 'You are: ' + this.move;
+            }else{
+                this.moveContainer.textContent = "Waiting for an opponent to join."
+            }
     }
     restart() {
         this.init();

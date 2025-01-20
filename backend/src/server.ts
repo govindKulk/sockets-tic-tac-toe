@@ -1,85 +1,91 @@
 import { Server } from "socket.io";
+import { createServer } from "http"; // Import to create a shared server
+import app from "./app"; // Your Express app
 import { GameRoom } from "./GameRoom";
 
-const io = new Server(3000, { cors: { origin: "*" } });
+// Set up the port
+const PORT = parseInt(process.env.PORT) || 3000;
 
-const gameRoom = GameRoom.getInstance(); // Singleton instance
+// Create a shared HTTP server
+const httpServer = createServer(app); // Pass the Express app
+
+// Attach Socket.io to the same server
+const io = new Server(httpServer, {
+    cors: {
+        origin: ["https://sockets-tic-tac-toe.vercel.app/", "http://localhost:5173/"],
+        methods: ["GET", "POST"],
+        credentials: true, // Ensure cookies are sent if needed
+    },
+});
+
+console.log(`Server running on port ${PORT}`);
+
+// Singleton instance of GameRoom
+const gameRoom = GameRoom.getInstance();
 
 io.on("connection", (socket) => {
     console.log("Client connected:", socket.id);
-    const room = gameRoom.addToRoom(socket.id);
-    console.log(`${socket.id} has joined ${room.roomId}`);
 
-    // join the socket in a room
-    socket.join(room.roomId)
+    function joinRoom() {
+        const room = gameRoom.addToRoom(socket.id);
+        console.log(`${socket.id} has joined ${room.roomId}`);
 
+        // Join the socket to a room
+        socket.join(room.roomId);
 
-    // 
-    socket.emit("join-game", { 
-        roomId: room.roomId,
-        user: (!room.players.player2 ? 'player-1' : 'player-2') 
-    });
-
-    // if both players are joined then start the game
-    if(room.players.player1 && room.players.player2){
-        io.to(room.roomId).emit('start-game', {
+        // Emit join-game event
+        io.to(room.roomId).emit("join-game", {
+            roomId: room.roomId,
             player1: room.players.player1,
             player2: room.players.player2,
-            gameState: []
-        })
+            gameState: [],
+        });
+
+        console.log("Rooms from joinRoom():", gameRoom.getRooms());
+        return room;
     }
 
-    // listen on move
-    socket.on('move', (data) => {
+    let room = joinRoom();
+
+    socket.on("move", (data) => {
         console.log(data);
-        socket.to(room.roomId).emit('move', data)
-    })
-    
-    // listen to restart the game
-    socket.on('restart', () => {
-        socket.to(room.roomId).emit('restart', )
-    })
-    
+        socket.to(room.roomId).emit("move", data);
+    });
 
+    socket.on("restart", () => {
+        socket.to(room.roomId).emit("restart");
+    });
 
+    socket.on("rematch", () => {
+        socket.leave(room.roomId);
+        console.log("Rooms:", gameRoom.getRooms());
+        room = joinRoom();
+    });
 
-
-
-    // Handle disconnects
     socket.on("disconnect", () => {
         console.log(`Client disconnected: ${socket.id}`);
-        // Optional: Handle cleanup logic for disconnected players
 
-        /*
-        whenever a client disconnects from a room
-        we have to broadcast event to other player in the room that client has been disconnected
-        then remove that room from the rooms
-        */
-        let room = gameRoom.getRoom(socket.id);
-        
-        console.log('room', room);
-        //  handle if room has only 1 element
-        if (room && Object.keys(room.players).length == 1){
+        const room = gameRoom.getRoom(socket.id);
+
+        if (room && Object.keys(room.players).length === 1) {
             socket.leave(room.roomId);
             gameRoom.deleteRoom(room);
             return;
         }
 
+        if (room) {
+            socket.leave(room.roomId);
+            gameRoom.deleteRoom(room);
+            io.to(room.roomId).emit("opponent-disconnected", {
+                user: "player-1",
+            });
+        }
 
-        let player1Id = room.players.player1 === socket.id ? room.players.player2 : room.players.player1;
-        room.players = {player1: player1Id  }
-
-        gameRoom.setRoom(room);
-
-        socket.leave(room.roomId);
-        socket.to(room.roomId).emit('opponent-disconnected', {
-            user: 'player-1'
-    
-        });
+        console.log("Rooms from disconnect:", gameRoom.getRooms());
     });
+});
 
-    return {
-        socket,
-        room
-    }
+// Start the server
+httpServer.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 });
