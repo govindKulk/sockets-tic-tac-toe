@@ -1,7 +1,8 @@
 import {v4 as uuid} from 'uuid';
 
-type Room = {
+export type Room = {
     roomId: string;
+    isPrivate: boolean;
     players: {
         player1: string;
         player2?: string;
@@ -22,10 +23,11 @@ export class GameRoom {
     }
 
     // Create a new room and add Player 1
-    createRoom(player1: string): Room {
+    createRoom(player1: string, isPrivate = false, privateRoomId: string): Room {
         const newRoom: Room = {
-            roomId: `room-id-${uuid()}`,
+            roomId: `room-id-${!isPrivate ? uuid(): privateRoomId}`,
             players: { player1 },
+            isPrivate
         };
 
         this.rooms.push(newRoom);
@@ -34,14 +36,26 @@ export class GameRoom {
 
     // Get an empty room where Player 2 can join
     getAnEmptyRoom(): Room | undefined {
-        return this.rooms.find((room) => Object.keys(room.players).length === 1);
+        return this.rooms.find((room) => Object.keys(room.players).length === 1 && !room.isPrivate);
     }
 
     // Add Player 2 to an empty room
-    addToRoom(player2: string): Room {
+    addToRoom(player2: string, isPrivate = false, privateRoomId: string): Room {
+
+        if(isPrivate){
+            const privateRoom = this.getRoomById(privateRoomId);
+            console.log('private room got from addToRoom: ', privateRoom);
+            if(privateRoom){
+                privateRoom.players.player2 = player2;
+            }else{
+                const privateRoom = this.createRoom(player2, true, privateRoomId);
+                return privateRoom;
+            }
+            return privateRoom ;
+        }
         const emptyRoom = this.getAnEmptyRoom();
         if (!emptyRoom) {
-            const room = this.createRoom(player2);
+            const room = this.createRoom(player2, false, '');
             return room
         }
 
@@ -52,6 +66,13 @@ export class GameRoom {
 
     getRoom(player: string){
         return this.rooms.find(room => room.players.player1 === player || room.players.player2 === player);
+    }
+    getRoomById(roomID: string){
+        const room = this.rooms.find(room => room.roomId === `room-id-${roomID}` );
+        if(!room) {
+            return null;
+        }
+        return room;
     }
 
     deleteRoom(room: Room) {

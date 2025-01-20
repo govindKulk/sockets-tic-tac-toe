@@ -1,6 +1,7 @@
 import {io} from 'socket.io-client'
 
 class Game {
+
     rows = 3;
     columns = 3;
     player1 = 'X';
@@ -12,14 +13,19 @@ class Game {
     user = null
     isYourMove = false
     isOpponentJoined = false
+
+    startGameBtn = document.getElementById('start-game');
     board = document.getElementById('board');
     resultContainer = document.getElementById('result');
     resetBtn = document.getElementById('reset-btn');
     moveContainer = document.getElementById('move');
-
+    totalMoves = 0
+    moveIndicator = document.getElementById('move-indicator');
     socket = null
+    customRoomBtn = document.getElementById('custom-room-btn');
+    isPrivate = false
 
-    constructor(rows = 3, columns = 3, player1 = "X", player2 = "O") {
+    constructor(rows = 3, columns = 3, player1 = "X", player2 = "O",) {
         this.rows = rows;
         this.columns = columns;
         this.player1 = player1;
@@ -28,17 +34,37 @@ class Game {
         // Bind methods once
         this.handleClick = this.handleClick.bind(this);
         this.restart = this.restart.bind(this);
+        this.totalMoves = 0
 
-        this.init();
+        this.startGameBtn.addEventListener('click', function(){
+            console.log(this.init)
+            this.init.bind(this)();
+            this.startGameBtn.style.display = 'none';
+        }.bind(this))
+
+        this.customRoomBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('clicked')
+            const id = crypto.randomUUID();    
+            window.location.href = '/room/'  + id;
+        
+        })
     }
     
-    connectToServer() {
-        this.socket = io("https://sockets-tic-tac-toe.onrender.com", {
+    connectToServer(isPrivate = false) {
+        this.socket = io("http://localhost:3000", {
             withCredentials: true, // Must match server credentials
             transports: ["websocket"], // Ensure WebSocket transport is used
         });
         console.log(this.socket)
-
+        
+        if(this.socket && !isPrivate){
+            if(!isPrivate){
+                this.socket.emit('create-public-room');
+            }else{
+                this.socket.emit('create-private-room', this.privateRoomId)
+            }
+        }
         this.socket.on('join-game', (data) => {
             const {roomId, player1, player2} = data;
             this.user = (this.socket.id === player1 ? 'player-1' : 'player-2')
@@ -52,33 +78,39 @@ class Game {
                 if(this.user === 'player-1'){
                     this.isYourMove = true;
                 }
+                this.renderMoveIndicator();
             }
             
             console.log(roomId)
 
         })
         
-        this.socket.on('opponent-disconnected', () => {
+        this.socket.on('opponent-disconnected', (data) => {
+            const {isPrivate} = data;
             this.moveContainer.textContent = "Opponent disconnected ! Waiting for a new oppenent."
             console.log("opponent no more")
             this.isOpponentJoined = false;
-            this.socket.emit('rematch')
+            if(!isPrivate){
+                this.socket.emit('rematch')
+            }else{
+                this.init();
+                this.isYourMove = false;
+            }
         } )
 
-        this.socket.on('start-game', (data) => {
-            console.log(data)
-            this.setMove();
-            if(this.user === 'player-1'){
-                this.isYourMove = true;
-            }
-        })
+        
 
         this.socket.on('move', (data) => {
             console.log(data)
             this.isYourMove = ! this.isYourMove;
             this.gameStatus = data.gameStatus;
             this.updateBoard(data.gameBoard);
+            this.totalMoves += 1;
+            this.renderWinner();
+            this.renderMoveIndicator();
         })
+
+
 
         this.socket.on('restart', () => {
             this.init();
@@ -92,7 +124,7 @@ class Game {
         this.resetBtn.style.display = 'none';
         
         this.moveContainer.style.display = 'none';
-
+        this.totalMoves = 0;
         this.winner = null;
         this.move = this.player1;
         this.gameStatus = 'playing';
@@ -199,7 +231,8 @@ class Game {
         cell.textContent = this.move;
 
         this.checkGameStatus();
-       
+        this.totalMoves += 1
+        console.log(this.totalMoves)
         this.renderWinner();
 
         let gameBoard = this.rowElements.map(row => row.map(cell => cell.textContent));
@@ -208,6 +241,7 @@ class Game {
             gameBoard
         } )
         this.isYourMove = ! this.isYourMove;
+        this.renderMoveIndicator();
     }
 
     updateBoard(gameBoard) {
@@ -225,6 +259,12 @@ class Game {
     }
     
     renderWinner() {
+        if (this.totalMoves === this.rows * this.columns && !this.winner){
+            this.resultContainer.textContent = "Draw! Restart to play again."
+            this.resetBtn.style.display = 'flex'
+            this.gameStatus == 'draw';
+            return;
+        }
         if (this.gameStatus === 'complete') {
             let winningText = this.user === 'player-1' 
                                 ?  this.winner === "X" ? 'You are a winner' : 'You Lost' 
@@ -249,7 +289,56 @@ class Game {
         this.socket.emit('restart');
     }
 
+    renderMoveIndicator() {
+        if(this.gameStatus == 'draw'){
+            this.moveIndicator.textContent = '';
+            return;
+        }
+        if(this.isYourMove){
+            this.moveIndicator.textContent = "Your Move"
+        }else{
+            this.moveIndicator.textContent = "Opponent's Move"
+        }
+    }
+
+    joinPrivateRoom(roomId) {
+        this.startGameBtn.removeEventListener('click', () => {})
+        this.startGameBtn.style.display = 'none'
+        this.privateRoomId = roomId;
+
+        if(!this.socket){
+            this.connectToServer(true)
+        }
+        this.socket.emit('create-private-room', {
+            privateRoomId: `${roomId}`
+        })
+
+
+    }
+
+
 
 }
 
 const game = new Game();
+
+function router() {
+    const path = window.location.pathname;
+    
+    if (path.startsWith('/room/')) {
+        const roomId = path.split('/room/')[1];
+        console.log(roomId)
+        if (roomId) {
+            game.isPrivate = true;
+            game.joinPrivateRoom(roomId); // Function to join the room
+        } else {
+            console.error('Room ID not found in the URL.');
+        }
+    } 
+}
+
+
+
+
+    window.addEventListener('popstate', router); // Handle back/forward navigation
+    window.addEventListener('load', router); // Handle initial load

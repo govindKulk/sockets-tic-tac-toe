@@ -1,7 +1,7 @@
 import { Server } from "socket.io";
 import { createServer } from "http"; // Import to create a shared server
 import app from "./app"; // Your Express app
-import { GameRoom } from "./GameRoom";
+import { GameRoom, Room } from "./GameRoom";
 
 // Set up the port
 const PORT = parseInt(process.env.PORT) || 3000;
@@ -26,8 +26,8 @@ const gameRoom = GameRoom.getInstance();
 io.on("connection", (socket) => {
     console.log("Client connected:", socket.id);
 
-    function joinRoom() {
-        const room = gameRoom.addToRoom(socket.id);
+    function joinRoom(isPrivate = false, privateRoomId = "") {
+        const room = gameRoom.addToRoom(socket.id, isPrivate, privateRoomId);
         console.log(`${socket.id} has joined ${room.roomId}`);
 
         // Join the socket to a room
@@ -45,7 +45,33 @@ io.on("connection", (socket) => {
         return room;
     }
 
-    let room = joinRoom();
+    let room: Room;
+
+    socket.emit('connection-success');
+         
+    socket.on('create-public-room', () => {
+        console.log('create public room')
+        room = joinRoom();
+    })
+    
+    socket.on('create-private-room', (data) => {
+        const {privateRoomId} = data;
+        console.log('private room id ', privateRoomId)
+        room = joinRoom(true, privateRoomId);
+        console.log('create private room')
+        console.log('room form crate-private-room : ', gameRoom.getRooms());
+    })
+
+    socket.on('join-private-room', (roomId) => {
+        room = gameRoom.getRoomById(roomId)
+        if(room){
+            socket.join(room.roomId);
+        }else{
+            socket.emit('wrong-room-id');
+        }
+    })
+
+
 
     socket.on("move", (data) => {
         console.log(data);
@@ -66,6 +92,24 @@ io.on("connection", (socket) => {
         console.log(`Client disconnected: ${socket.id}`);
 
         const room = gameRoom.getRoom(socket.id);
+        console.log('got room : ', room);
+
+        if(room && room.isPrivate){
+            if(socket.id === room.players.player1){
+                gameRoom.deleteRoom(room);
+            }else{
+                room.players = {
+                    player1: room.players.player1
+                }
+            }
+            socket.leave(room.roomId);
+            io.to(room.roomId).emit("opponent-disconnected", {
+                    user: "player-1",
+                    isPrivate: true
+            });
+            
+            return;
+        }
 
         if (room && Object.keys(room.players).length === 1) {
             socket.leave(room.roomId);
