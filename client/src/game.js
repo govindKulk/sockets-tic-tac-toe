@@ -52,7 +52,7 @@ class Game {
     }
     
     connectToServer(isPrivate = false) {
-        this.socket = io("http://localhost:3000", {
+        this.socket = io("https://sockets-tic-tac-toe.onrender.com", {
             withCredentials: true, // Must match server credentials
             transports: ["websocket"], // Ensure WebSocket transport is used
         });
